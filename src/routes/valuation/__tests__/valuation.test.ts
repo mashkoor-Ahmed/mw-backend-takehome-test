@@ -1,7 +1,38 @@
 import { fastify } from '~root/test/fastify';
 import { VehicleValuationRequest } from '../types/vehicle-valuation-request';
+import * as superCarValuation from '@app/super-car/super-car-valuation';
+import { vi, Mock } from 'vitest';
+import { VehicleValuation } from '@app/models/vehicle-valuation';
+import { ObjectLiteral, Repository } from 'typeorm';
 
 describe('ValuationController (e2e)', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+
+    const returnedValuation = new VehicleValuation();
+    returnedValuation.vrm = "ABC789";
+    returnedValuation.lowestValue = 1000;
+    returnedValuation.highestValue = 2000;
+
+    vi.spyOn(superCarValuation, 'fetchValuationFromSuperCarValuation').mockReturnValue(
+      Promise.resolve(returnedValuation)
+    );
+
+    vi.spyOn(fastify.orm, 'getRepository').mockImplementation(() => {
+      return {
+        insert: () =>
+          Promise.resolve(vitest.fn().mockReturnValue(returnedValuation)),
+        findOneBy: () =>
+          Promise.resolve(vitest.fn().mockReturnValue([returnedValuation])),
+      } as unknown as Repository<ObjectLiteral>;
+    });
+
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe('PUT /valuations/', () => {
     it('should return 404 if VRM is missing', async () => {
       const requestBody: VehicleValuationRequest = {
