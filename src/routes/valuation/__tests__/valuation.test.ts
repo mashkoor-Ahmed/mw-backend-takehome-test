@@ -33,6 +33,53 @@ describe('ValuationController (e2e)', () => {
     vi.restoreAllMocks();
   });
 
+  describe('GET /valuations/', () => {
+    it('should return 200 when valuation found in DB', async () => {
+      const res = await fastify.inject({
+        url: '/valuations/XY1234',
+        method: 'GET'
+      });
+
+      expect(res.statusCode).toStrictEqual(200);
+    });
+
+    it('should return 404 when valuation not found in DB', async () => {
+      // TODO tried to declare vi.spyOn(fastify.orm, 'getRepository') as a variable in the beforeEach block
+      // couldn't quite get it working yet 
+      (fastify.orm.getRepository as Mock).mockImplementationOnce(() => {
+        return {
+          findOneBy: () => Promise.resolve(null),
+        } as unknown as Repository<ObjectLiteral>;
+      });
+
+      const res = await fastify.inject({
+        url: '/valuations/XY1234',
+        method: 'GET'
+      });
+
+      expect(res.statusCode).toStrictEqual(404);
+    });
+
+    it('should return 400 if VRM is 8 characters or more', async () => {
+      const res = await fastify.inject({
+        url: '/valuations/12345678',
+        method: 'GET'
+      });
+
+      expect(res.statusCode).toStrictEqual(400);
+    });
+
+    it('should return 404 if VRM is missing from path', async () => {
+      const res = await fastify.inject({
+        url: '/valuations',
+        method: 'GET'
+      });
+
+      expect(res.statusCode).toStrictEqual(404);
+    });
+  
+  });
+
   describe('PUT /valuations/', () => {
     it('should return 404 if VRM is missing', async () => {
       const requestBody: VehicleValuationRequest = {
