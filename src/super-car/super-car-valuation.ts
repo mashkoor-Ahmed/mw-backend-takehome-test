@@ -8,7 +8,7 @@ export async function fetchValuationFromSuperCarValuation(
   mileage: number,
 ): Promise<VehicleValuation> {
   axios.defaults.baseURL =
-    'localhost:3003/supercar/';
+    'localhost:3003/supercar';
   const response = await axios.get<SuperCarValuationResponse>(
     `valuations/${vrm}?mileage=${mileage}`,
   );
@@ -18,6 +18,7 @@ export async function fetchValuationFromSuperCarValuation(
   valuation.vrm = vrm;
   valuation.lowestValue = response.data.valuation.lowerValue;
   valuation.highestValue = response.data.valuation.upperValue;
+  valuation.valuationProvider = "Super Car Valuations"
 
   return valuation;
 }

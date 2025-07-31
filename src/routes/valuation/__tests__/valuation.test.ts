@@ -13,6 +13,7 @@ describe('ValuationController (e2e)', () => {
     returnedValuation.vrm = "ABC789";
     returnedValuation.lowestValue = 1000;
     returnedValuation.highestValue = 2000;
+    returnedValuation.valuationProvider = "Super Car Valuations";
 
     vi.spyOn(superCarValuation, 'fetchValuationFromSuperCarValuation').mockReturnValue(
       Promise.resolve(returnedValuation)
@@ -23,7 +24,7 @@ describe('ValuationController (e2e)', () => {
         insert: () =>
           Promise.resolve(vitest.fn().mockReturnValue(returnedValuation)),
         findOneBy: () =>
-          Promise.resolve(vitest.fn().mockReturnValue([returnedValuation])),
+          Promise.resolve(vitest.fn().mockReturnValue([returnedValuation]))
       } as unknown as Repository<ObjectLiteral>;
     });
 
@@ -150,6 +151,7 @@ describe('ValuationController (e2e)', () => {
       });
 
       expect(res.statusCode).toStrictEqual(200);
+      expect(res.json().valuationProvider).toStrictEqual("Super Car Valuations");
     });
   });
 });

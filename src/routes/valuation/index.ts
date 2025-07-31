@@ -1,7 +1,8 @@
 import { FastifyInstance } from 'fastify';
 import { VehicleValuationRequest } from './types/vehicle-valuation-request';
-import { fetchValuationFromSuperCarValuation } from '@app/super-car/super-car-valuation';
 import { VehicleValuation } from '@app/models/vehicle-valuation';
+import { validateVrm, validateMileage } from './request-validation-helpers';
+import { ValuationService } from '@app/service/valuation-service';
 
 export function valuationRoutes(fastify: FastifyInstance) {
   fastify.get<{
@@ -9,16 +10,14 @@ export function valuationRoutes(fastify: FastifyInstance) {
       vrm: string;
     };
   }>('/valuations/:vrm', async (request, reply) => {
-    const valuationRepository = fastify.orm.getRepository(VehicleValuation);
     const { vrm } = request.params;
 
-    if (vrm === null || vrm === '' || vrm.length > 7) {
-      return reply
-        .code(400)
-        .send({ message: 'vrm must be 7 characters or less', statusCode: 400 });
-    }
+    if (!validateVrm(vrm, reply)) return;
 
-    const result = await valuationRepository.findOneBy({ vrm: vrm });
+    const valuationRepository = fastify.orm.getRepository(VehicleValuation);
+    const service = new ValuationService(valuationRepository);
+
+    const result = await service.getValuation(vrm);
 
     if (result == null) {
       return reply
@@ -38,36 +37,20 @@ export function valuationRoutes(fastify: FastifyInstance) {
       vrm: string;
     };
   }>('/valuations/:vrm', async (request, reply) => {
-    const valuationRepository = fastify.orm.getRepository(VehicleValuation);
     const { vrm } = request.params;
     const { mileage } = request.body;
 
-    if (vrm.length > 7) {
-      return reply
-        .code(400)
-        .send({ message: 'vrm must be 7 characters or less', statusCode: 400 });
-    }
+    if (!validateVrm(vrm, reply)) return;
+    if (!validateMileage(mileage, reply)) return;
 
-    if (mileage === null || mileage <= 0) {
-      return reply
-        .code(400)
-        .send({
-          message: 'mileage must be a positive number',
-          statusCode: 400,
-        });
-    }
+    const valuationRepository = fastify.orm.getRepository(VehicleValuation);
+    const valuationService = new ValuationService(valuationRepository);
 
-    const valuation = await fetchValuationFromSuperCarValuation(vrm, mileage);
-
-    // Save to DB.
-    await valuationRepository.insert(valuation).catch((err) => {
-      if (err.code !== 'SQLITE_CONSTRAINT') {
-        throw err;
-      }
-    });
+    const valuation = valuationService.createValuation(vrm, mileage);
 
     fastify.log.info('Valuation created: ', valuation);
 
     return valuation;
   });
+
 }
