@@ -4,6 +4,7 @@ import { VehicleValuation } from '@app/models/vehicle-valuation';
 import { ThirdPartyFailoverService } from './thirdparty-failover-service';
 import { fetchValuationFromSuperCarValuation } from '@app/super-car/super-car-valuation';
 import { fetchValuationFromPremiumCarValuation } from '@app/premium-car/premium-car-valuation';
+import { DependencyUnavailableException } from '@app/errors/dependency-unavailable-exception';
 
 export class ValuationService {
   constructor(private readonly valuationRepository: Repository<VehicleValuation>,
@@ -14,19 +15,24 @@ export class ValuationService {
     const useFailover = this.thirdPartyFailoverService.isFailoverEnabled();
     let valuation: VehicleValuation;
 
-    if (useFailover) {
-        valuation = await fetchValuationFromPremiumCarValuation(vrm);
-    } else {
-        valuation = await fetchValuationFromSuperCarValuation(vrm, mileage);
-        this.logSuccessOrFailure(valuation);
-    }
+    try {
+        if (useFailover) {
+            valuation = await fetchValuationFromPremiumCarValuation(vrm);
+        } else {
+            valuation = await fetchValuationFromSuperCarValuation(vrm, mileage);
+            this.thirdPartyFailoverService.logSuccessfulRequest();
+        }
 
-    if (valuation.valuationProvider != null) try {
-      await this.valuationRepository.insert(valuation);
+        try {
+            await this.valuationRepository.insert(valuation);
+        } catch (err: any) {
+            if (err.code !== 'SQLITE_CONSTRAINT') { throw err; }
+        }
     } catch (err: any) {
-      if (err.code !== 'SQLITE_CONSTRAINT') {
+        if (err instanceof DependencyUnavailableException) {
+            this.thirdPartyFailoverService.logFailedRequest(Date.now())
+        }
         throw err;
-      }
     }
 
     return valuation;

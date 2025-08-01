@@ -4,6 +4,7 @@ import { VehicleValuation } from '@app/models/vehicle-valuation';
 import { validateVrm, validateMileage } from './request-validation-helpers';
 import { ValuationService } from '@app/service/valuation-service';
 import { ThirdPartyFailoverService } from '@app/service/thirdparty-failover-service';
+import { DependencyUnavailableException } from '@app/errors/dependency-unavailable-exception';
 
 export function valuationRoutes(fastify: FastifyInstance) {
   fastify.get<{
@@ -49,11 +50,20 @@ export function valuationRoutes(fastify: FastifyInstance) {
     const failoverService = new ThirdPartyFailoverService();
     const valuationService = new ValuationService(valuationRepository, failoverService);
 
-    const valuation = valuationService.createValuation(vrm, mileage);
-
-    fastify.log.info('Valuation created: ', valuation);
-
-    return valuation;
+    try {
+      const valuation = valuationService.createValuation(vrm, mileage);
+      fastify.log.info('Valuation created: ', valuation);
+      return valuation;
+    } catch (err: any) {
+      if (err instanceof DependencyUnavailableException) {
+        reply
+          .code(503)
+          .send({ message: 'SERVICE_UNAVAILABLE', statusCode: 503 });
+      }
+      reply
+        .code(500)
+        .send({ message: 'INTERNAL_ERROR', statusCode: 500 });
+    }
   });
 
 }

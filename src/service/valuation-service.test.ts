@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ValuationService } from './valuation-service';
 import { ThirdPartyFailoverService } from './thirdparty-failover-service';
+
 import { VehicleValuation } from '@app/models/vehicle-valuation';
 import { Repository } from 'typeorm';
 
 import * as SuperCarModule from '@app/super-car/super-car-valuation';
 import * as PremiumCarModule from '@app/premium-car/premium-car-valuation';
+import { DependencyUnavailableException } from '@app/errors/dependency-unavailable-exception';
 
 describe('ValuationService', () => {
   let mockRepository: Partial<Repository<VehicleValuation>>;
@@ -52,15 +54,14 @@ describe('ValuationService', () => {
     expect(mockFailoverService.logSuccessfulRequest).toHaveBeenCalled();
   });
 
-  it('should log failed request to SuperCar valuation', async () => {
+  it('should log failed request to SuperCar valuation and throw exception', async () => {
     vi.spyOn(mockFailoverService, 'isFailoverEnabled').mockReturnValue(false);
+    const exceptionThrown = new DependencyUnavailableException('Error from Super Car Valuation');
     const spy = vi.spyOn(SuperCarModule, 'fetchValuationFromSuperCarValuation')
-      .mockResolvedValue(new VehicleValuation()); // no values set
-
-    const result = await service.createValuation('ABC345', 1000);
+      .mockRejectedValueOnce(exceptionThrown);
+    await expect(service.createValuation('ABC345', 1000)).rejects.toThrow(exceptionThrown);
 
     expect(spy).toHaveBeenCalledWith('ABC345', 1000);
-    expect(result).toStrictEqual(new VehicleValuation());
     expect(mockRepository.insert).toHaveBeenCalledTimes(0);
     expect(mockFailoverService.logFailedRequest).toHaveBeenCalled();
   });
@@ -105,5 +106,19 @@ describe('ValuationService', () => {
 
     expect(mockRepository.findOneBy).toHaveBeenCalledWith({ vrm: 'ABC123' });
     expect(result).toEqual(someValuation);
+  });
+
+  it('should return correct result even if valuationProvider not present in DB', async () => {
+    const valuationEntity: VehicleValuation = {
+      vrm: 'ABC123',
+      highestValue: 10000,
+      lowestValue: 8000,
+      midpointValue: 9000
+    };
+    vi.spyOn(mockRepository, 'findOneBy').mockResolvedValueOnce(valuationEntity)
+    const result = await service.getValuation('ABC123');
+
+    expect(mockRepository.findOneBy).toHaveBeenCalledWith({ vrm: 'ABC123' });
+    expect(result).toEqual(valuationEntity);
   });
 });
