@@ -12,6 +12,9 @@ export class ValuationService {
   ) {}
 
   async createValuation(vrm: string, mileage: number): Promise<VehicleValuation> {
+    const existingValuation = await this.getValuation(vrm);
+    if (existingValuation) return existingValuation; // saving call to third parties
+
     const useFailover = this.thirdPartyFailoverService.isFailoverEnabled();
     let valuation: VehicleValuation;
 

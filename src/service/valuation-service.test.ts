@@ -25,7 +25,7 @@ describe('ValuationService', () => {
   beforeEach(() => {
     mockRepository = {
       insert: vi.fn().mockResolvedValue(someValuation),
-      findOneBy: vi.fn().mockResolvedValue(someValuation),
+      findOneBy: vi.fn().mockResolvedValue(null),
     };
 
     mockFailoverService = {
@@ -114,10 +114,21 @@ describe('ValuationService', () => {
   });
 
   it('should retrieve valuation by vrm', async () => {
+    vi.spyOn(mockRepository, 'findOneBy').mockResolvedValueOnce(someValuation);
+
     const result = await service.getValuation('ABC123');
 
     expect(mockRepository.findOneBy).toHaveBeenCalledWith({ vrm: 'ABC123' });
     expect(result).toEqual(someValuation);
+  });
+
+  it('should return null if no valuation exists in DB', async () => {
+    (mockRepository.findOneBy as any).mockReturnValue(null);
+
+    const result = await service.getValuation('ABC123');
+
+    expect(mockRepository.findOneBy).toHaveBeenCalledWith({ vrm: 'ABC123' });
+    expect(result).toEqual(null);
   });
 
   it('should return correct result even if valuationProvider not present in DB', async () => {
@@ -132,5 +143,20 @@ describe('ValuationService', () => {
 
     expect(mockRepository.findOneBy).toHaveBeenCalledWith({ vrm: 'ABC123' });
     expect(result).toEqual(valuationEntity);
+  });
+
+  it('createValuation should not call third parties when valuation already exists in DB', async () => {
+    vi.spyOn(mockFailoverService, 'isFailoverEnabled').mockReturnValue(false);
+    vi.spyOn(mockRepository, 'findOneBy').mockResolvedValueOnce(someValuation);
+    
+    const spy = vi.spyOn(SuperCarModule, 'fetchValuationFromSuperCarValuation')
+      .mockResolvedValue(someValuation);
+
+    const result = await service.createValuation('ABC345', 1000);
+
+    expect(spy).toHaveBeenCalledTimes(0);
+    expect(result).toBe(someValuation);
+    expect(mockRepository.insert).toHaveBeenCalledTimes(0);
+    expect(mockFailoverService.logSuccessfulRequest).toHaveBeenCalledTimes(0);    
   });
 });
