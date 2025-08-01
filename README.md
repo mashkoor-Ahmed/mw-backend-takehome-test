@@ -119,4 +119,15 @@ The URI for this test stub in Mocky is https://run.mocky.io/v3/0dfda26a-3a5a-43e
 
 
 # Candidate Notes
-Here is a place for you to put any notes regarding the changes you made and the reasoning and what further changes you wish to suggest.
+
+* Timeboxed this exercise to around 5-6 hours split over 3 days. Regretably I couldn't finish everything as I'd have liked - a lot of time was spent just getting to grips with Typescript once again (I come from a Java background) - I had particular trouble getting grips with the mocking setups at times.
+
+* Currently there is a bug in the controller code for the PUT endpoint. My expectation is the ValuationService should throw a DependencyUnavailableException when the third party calls fails, and the controller should catch this and return a 503 status code as a result. It doesn't seem to be doing this hence I have 2 failing tests which I've left to show my intent. It could be the case that I've not set up the mocks properly? Chances are it's a silly mistake that's staring me in the face :-) 
+
+* Failover logic implementation: I'm happy that the current solution works for a standalone / single instance server. In a more distributed, production-like setup, I would consider using a dedicated circuit breaker library in the interest of not reinventing the wheel, and knowing that the library might be better equipped to handle edge cases. Another approach would be having successful or failed request logs published as events to a queue, or eventing platform like Kafka. A separate service would be analysing the events in real time and deciding when to do the failover. The separate service could publish 'Trigger Failover' and 'Revert Failover' events which this application can subscribe to.
+
+* I've noticed a lot of similarity between the client code for super-car-valuation.ts and premium-car-valuation.ts - a lot of the logic for handling the error responses, committing the ProviderLog etc. could be abstracted out into a helper class. An improvement I would try to make given more time.
+
+* Given more time I would definitely expand the assertions in the valuation controller/route e2e tests, and include more assertions on what's returned in the response body by our API.
+
+* Noticed a logger.ts file in the repo, but it wasn't immediately clear if it was something for us to use when fulfilling the ProviderLog requirement. It made sense to have a separate repository to hold these logs as we'd want to run queries against this datastore at a later point in time. I went with a composite key of VRM + Timestamp Epoch to allow multiple entries for a given VRM, whilst ensuring queries are performant due to the lexicographically ordered nature of the primary key, data being less fragmented etc.
