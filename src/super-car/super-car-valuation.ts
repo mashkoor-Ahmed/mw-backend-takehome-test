@@ -14,7 +14,7 @@ export async function fetchValuationFromSuperCarValuation(
     'localhost:3003/supercar';
 
   let status: number | undefined;
-  let error: any;
+  let error: any | undefined;
   let durationMs = -1;
   let reqUrl = `localhost:3003/supercar/valuations/${vrm}?mileage=${mileage}`;
   const startTime = Date.now();
@@ -37,10 +37,10 @@ export async function fetchValuationFromSuperCarValuation(
     return valuation;
   } catch (err: any) {
     error = err;
-    const status = err?.response?.status;
+    status = err?.response?.status;
     durationMs = Date.now() - startTime;
 
-    if (status >= 500) {
+    if (status && status >= 500) {
       throw new DependencyUnavailableException(
         `SuperCarValuation service failed with status ${status}`,
       );
@@ -53,9 +53,10 @@ export async function fetchValuationFromSuperCarValuation(
       "Super Car Valuations",
       reqUrl,
       vrm,
-      status ?? 0,
+      status ?? -1,
       startTime,
-      durationMs
+      durationMs,
+      error ?? undefined
     )
   }
 }

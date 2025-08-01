@@ -49,10 +49,10 @@ export async function fetchValuationFromPremiumCarValuation(
     return valuation;
   } catch (err: any) {
     error = err;
-    const status = err?.response?.status;
+    status = err?.response?.status;
     durationMs = Date.now() - startTime;
 
-    if (status >= 500) {
+    if (status && status >= 500) {
       throw new DependencyUnavailableException(
         `PremiumCarValuation service failed with status ${status}`,
       );
@@ -65,9 +65,10 @@ export async function fetchValuationFromPremiumCarValuation(
       "Premium Car Valuations",
       reqUrl,
       vrm,
-      status ?? 0,
+      status ?? -1,
       startTime,
-      durationMs
+      durationMs,
+      error ?? undefined
     )
   }
 }
