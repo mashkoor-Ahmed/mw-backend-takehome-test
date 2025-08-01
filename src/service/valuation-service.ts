@@ -29,7 +29,7 @@ export class ValuationService {
             if (err.code !== 'SQLITE_CONSTRAINT') { throw err; }
         }
     } catch (err: any) {
-        if (err instanceof DependencyUnavailableException) {
+        if (err instanceof DependencyUnavailableException && !useFailover) {
             this.thirdPartyFailoverService.logFailedRequest(Date.now())
         }
         throw err;

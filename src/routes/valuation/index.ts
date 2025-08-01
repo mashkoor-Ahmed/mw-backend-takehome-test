@@ -56,11 +56,10 @@ export function valuationRoutes(fastify: FastifyInstance) {
       return valuation;
     } catch (err: any) {
       if (err instanceof DependencyUnavailableException) {
-        reply
+        return reply
           .code(503)
           .send({ message: 'SERVICE_UNAVAILABLE', statusCode: 503 });
-      }
-      reply
+      } else return reply
         .code(500)
         .send({ message: 'INTERNAL_ERROR', statusCode: 500 });
     }

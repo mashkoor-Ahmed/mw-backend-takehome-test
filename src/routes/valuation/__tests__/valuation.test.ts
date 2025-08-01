@@ -1,9 +1,13 @@
 import { fastify } from '~root/test/fastify';
 import { VehicleValuationRequest } from '../types/vehicle-valuation-request';
 import * as superCarValuation from '@app/super-car/super-car-valuation';
+import * as premiumCarValuation from '@app/premium-car/premium-car-valuation';
+import * as thirdPartyFailoverService from '@app/service/thirdparty-failover-service';
+
 import { vi, Mock } from 'vitest';
 import { VehicleValuation } from '@app/models/vehicle-valuation';
 import { ObjectLiteral, Repository } from 'typeorm';
+import { DependencyUnavailableException } from '@app/errors/dependency-unavailable-exception';
 
 describe('ValuationController (e2e)', () => {
   beforeEach(async () => {
@@ -16,6 +20,10 @@ describe('ValuationController (e2e)', () => {
     returnedValuation.valuationProvider = "Super Car Valuations";
 
     vi.spyOn(superCarValuation, 'fetchValuationFromSuperCarValuation').mockReturnValue(
+      Promise.resolve(returnedValuation)
+    );
+
+    vi.spyOn(premiumCarValuation, 'fetchValuationFromPremiumCarValuation').mockReturnValue(
       Promise.resolve(returnedValuation)
     );
 
@@ -153,5 +161,44 @@ describe('ValuationController (e2e)', () => {
       expect(res.statusCode).toStrictEqual(200);
       expect(res.json().valuationProvider).toStrictEqual("Super Car Valuations");
     });
+
+    // TODO fix this test - maybe the mocking for fetchValuationFromSuperCarValuation isn't set up correctly??
+    it('should return 503 after failed request to Super Car Valuations', async () => {
+      vi.spyOn(superCarValuation, 'fetchValuationFromSuperCarValuation').mockRejectedValueOnce(
+        new DependencyUnavailableException('Super Car API unavailable')
+      );
+
+      const requestBody: VehicleValuationRequest = {
+        mileage: 10000,
+      };
+
+      const res = await fastify.inject({
+        url: '/valuations/ABC123',
+        body: requestBody,
+        method: 'PUT',
+      });
+
+      expect(res.statusCode).toStrictEqual(503);
+    });
+
+    // TODO fix this controller test - was struggling to set up the mock for isFailoverEnabled=true
+    it('should return 503 after failed request to Premium Car Valuations', async () => {
+      vi.spyOn(premiumCarValuation, 'fetchValuationFromPremiumCarValuation').mockRejectedValueOnce(
+        new DependencyUnavailableException('Premium Car API unavailable')
+      );
+
+      const requestBody: VehicleValuationRequest = {
+        mileage: 10000,
+      };
+
+      const res = await fastify.inject({
+        url: '/valuations/ABC123',
+        body: requestBody,
+        method: 'PUT',
+      });
+
+      expect(res.statusCode).toStrictEqual(503);
+    });
+
   });
 });

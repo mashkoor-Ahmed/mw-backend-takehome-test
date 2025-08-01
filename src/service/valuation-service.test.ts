@@ -80,6 +80,18 @@ describe('ValuationService', () => {
     expect(mockFailoverService.logSuccessfulRequest).toHaveBeenCalledTimes(0);
   });
 
+  it('should throw exception on failed request to PremiuimCarValuation', async () => {
+    vi.spyOn(mockFailoverService, 'isFailoverEnabled').mockReturnValue(true);
+    const exceptionThrown = new DependencyUnavailableException('Error from Premium Car Valuation');
+    const spy = vi.spyOn(PremiumCarModule, 'fetchValuationFromPremiumCarValuation')
+      .mockRejectedValueOnce(exceptionThrown);
+    await expect(service.createValuation('ABC345', 1000)).rejects.toThrow(exceptionThrown);
+
+    expect(spy).toHaveBeenCalledWith('ABC345');
+    expect(mockRepository.insert).toHaveBeenCalledTimes(0);
+    expect(mockFailoverService.logFailedRequest).toHaveBeenCalledTimes(0);
+  });
+
   it('should return result even if SQLITE_CONSTRAINT error during insert', async () => {
     vi.spyOn(mockFailoverService, 'isFailoverEnabled').mockReturnValue(false);
     vi.spyOn(SuperCarModule, 'fetchValuationFromSuperCarValuation')
