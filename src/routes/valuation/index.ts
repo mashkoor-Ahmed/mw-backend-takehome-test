@@ -3,6 +3,7 @@ import { VehicleValuationRequest } from './types/vehicle-valuation-request';
 import { VehicleValuation } from '@app/models/vehicle-valuation';
 import { validateVrm, validateMileage } from './request-validation-helpers';
 import { ValuationService } from '@app/service/valuation-service';
+import { ThirdPartyFailoverService } from '@app/service/thirdparty-failover-service';
 
 export function valuationRoutes(fastify: FastifyInstance) {
   fastify.get<{
@@ -15,7 +16,8 @@ export function valuationRoutes(fastify: FastifyInstance) {
     if (!validateVrm(vrm, reply)) return;
 
     const valuationRepository = fastify.orm.getRepository(VehicleValuation);
-    const service = new ValuationService(valuationRepository);
+    const failoverService = new ThirdPartyFailoverService();
+    const service = new ValuationService(valuationRepository, failoverService);
 
     const result = await service.getValuation(vrm);
 
@@ -44,7 +46,8 @@ export function valuationRoutes(fastify: FastifyInstance) {
     if (!validateMileage(mileage, reply)) return;
 
     const valuationRepository = fastify.orm.getRepository(VehicleValuation);
-    const valuationService = new ValuationService(valuationRepository);
+    const failoverService = new ThirdPartyFailoverService();
+    const valuationService = new ValuationService(valuationRepository, failoverService);
 
     const valuation = valuationService.createValuation(vrm, mileage);
 
