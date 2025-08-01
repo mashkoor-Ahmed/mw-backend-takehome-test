@@ -8,10 +8,12 @@ import { Repository } from 'typeorm';
 import * as SuperCarModule from '@app/super-car/super-car-valuation';
 import * as PremiumCarModule from '@app/premium-car/premium-car-valuation';
 import { DependencyUnavailableException } from '@app/errors/dependency-unavailable-exception';
+import { ProviderLogService } from '@app/logging/provider-log-service';
 
 describe('ValuationService', () => {
-  let mockRepository: Partial<Repository<VehicleValuation>>;
+  let mockValuationRepository: Partial<Repository<VehicleValuation>>;
   let mockFailoverService: ThirdPartyFailoverService;
+  let mockProviderLogService: ProviderLogService; 
   let service: ValuationService;
 
   const someValuation: VehicleValuation = {
@@ -23,7 +25,7 @@ describe('ValuationService', () => {
   };
 
   beforeEach(() => {
-    mockRepository = {
+    mockValuationRepository = {
       insert: vi.fn().mockResolvedValue(someValuation),
       findOneBy: vi.fn().mockResolvedValue(null),
     };
@@ -34,7 +36,15 @@ describe('ValuationService', () => {
       logSuccessfulRequest: vi.fn(),
     } as unknown as ThirdPartyFailoverService;
 
-    service = new ValuationService(mockRepository as Repository<VehicleValuation>, mockFailoverService);
+    mockProviderLogService = {
+      log: vi.fn(), 
+    } as unknown as ProviderLogService;
+
+    service = new ValuationService(
+      mockValuationRepository as Repository<VehicleValuation>, 
+      mockFailoverService,
+      mockProviderLogService
+    );
   });
 
   afterEach(() => {
@@ -48,9 +58,9 @@ describe('ValuationService', () => {
 
     const result = await service.createValuation('ABC345', 1000);
 
-    expect(spy).toHaveBeenCalledWith('ABC345', 1000);
+    expect(spy).toHaveBeenCalledWith('ABC345', 1000, mockProviderLogService);
     expect(result).toBe(someValuation);
-    expect(mockRepository.insert).toHaveBeenCalledWith(someValuation);
+    expect(mockValuationRepository.insert).toHaveBeenCalledWith(someValuation);
     expect(mockFailoverService.logSuccessfulRequest).toHaveBeenCalled();
   });
 
@@ -61,8 +71,8 @@ describe('ValuationService', () => {
       .mockRejectedValueOnce(exceptionThrown);
     await expect(service.createValuation('ABC345', 1000)).rejects.toThrow(exceptionThrown);
 
-    expect(spy).toHaveBeenCalledWith('ABC345', 1000);
-    expect(mockRepository.insert).toHaveBeenCalledTimes(0);
+    expect(spy).toHaveBeenCalledWith('ABC345', 1000, mockProviderLogService);
+    expect(mockValuationRepository.insert).toHaveBeenCalledTimes(0);
     expect(mockFailoverService.logFailedRequest).toHaveBeenCalled();
   });
 
@@ -73,9 +83,9 @@ describe('ValuationService', () => {
 
     const result = await service.createValuation('ABC123', 5000);
 
-    expect(spy).toHaveBeenCalledWith('ABC123');
+    expect(spy).toHaveBeenCalledWith('ABC123', mockProviderLogService);
     expect(result).toBe(someValuation);
-    expect(mockRepository.insert).toHaveBeenCalledWith(someValuation);
+    expect(mockValuationRepository.insert).toHaveBeenCalledWith(someValuation);
     expect(mockFailoverService.logFailedRequest).toHaveBeenCalledTimes(0);
     expect(mockFailoverService.logSuccessfulRequest).toHaveBeenCalledTimes(0);
   });
@@ -87,8 +97,8 @@ describe('ValuationService', () => {
       .mockRejectedValueOnce(exceptionThrown);
     await expect(service.createValuation('ABC345', 1000)).rejects.toThrow(exceptionThrown);
 
-    expect(spy).toHaveBeenCalledWith('ABC345');
-    expect(mockRepository.insert).toHaveBeenCalledTimes(0);
+    expect(spy).toHaveBeenCalledWith('ABC345', mockProviderLogService);
+    expect(mockValuationRepository.insert).toHaveBeenCalledTimes(0);
     expect(mockFailoverService.logFailedRequest).toHaveBeenCalledTimes(0);
   });
 
@@ -97,7 +107,7 @@ describe('ValuationService', () => {
     vi.spyOn(SuperCarModule, 'fetchValuationFromSuperCarValuation')
       .mockResolvedValue(someValuation);
 
-    (mockRepository.insert as any).mockRejectedValue({ code: 'SQLITE_CONSTRAINT' });
+    (mockValuationRepository.insert as any).mockRejectedValue({ code: 'SQLITE_CONSTRAINT' });
 
     await expect(service.createValuation('ABC123', 10000)).resolves.toBe(someValuation);
   });
@@ -108,26 +118,26 @@ describe('ValuationService', () => {
       .mockResolvedValue(someValuation);
 
     const error = { code: 'OTHER_SQL_EXCEPTION' };
-    (mockRepository.insert as any).mockRejectedValue(error);
+    (mockValuationRepository.insert as any).mockRejectedValue(error);
 
     await expect(service.createValuation('ABC123', 10000)).rejects.toEqual(error);
   });
 
   it('should retrieve valuation by vrm', async () => {
-    vi.spyOn(mockRepository, 'findOneBy').mockResolvedValueOnce(someValuation);
+    vi.spyOn(mockValuationRepository, 'findOneBy').mockResolvedValueOnce(someValuation);
 
     const result = await service.getValuation('ABC123');
 
-    expect(mockRepository.findOneBy).toHaveBeenCalledWith({ vrm: 'ABC123' });
+    expect(mockValuationRepository.findOneBy).toHaveBeenCalledWith({ vrm: 'ABC123' });
     expect(result).toEqual(someValuation);
   });
 
   it('should return null if no valuation exists in DB', async () => {
-    (mockRepository.findOneBy as any).mockReturnValue(null);
+    (mockValuationRepository.findOneBy as any).mockReturnValue(null);
 
     const result = await service.getValuation('ABC123');
 
-    expect(mockRepository.findOneBy).toHaveBeenCalledWith({ vrm: 'ABC123' });
+    expect(mockValuationRepository.findOneBy).toHaveBeenCalledWith({ vrm: 'ABC123' });
     expect(result).toEqual(null);
   });
 
@@ -138,16 +148,16 @@ describe('ValuationService', () => {
       lowestValue: 8000,
       midpointValue: 9000
     };
-    vi.spyOn(mockRepository, 'findOneBy').mockResolvedValueOnce(valuationEntity)
+    vi.spyOn(mockValuationRepository, 'findOneBy').mockResolvedValueOnce(valuationEntity)
     const result = await service.getValuation('ABC123');
 
-    expect(mockRepository.findOneBy).toHaveBeenCalledWith({ vrm: 'ABC123' });
+    expect(mockValuationRepository.findOneBy).toHaveBeenCalledWith({ vrm: 'ABC123' });
     expect(result).toEqual(valuationEntity);
   });
 
   it('createValuation should not call third parties when valuation already exists in DB', async () => {
     vi.spyOn(mockFailoverService, 'isFailoverEnabled').mockReturnValue(false);
-    vi.spyOn(mockRepository, 'findOneBy').mockResolvedValueOnce(someValuation);
+    vi.spyOn(mockValuationRepository, 'findOneBy').mockResolvedValueOnce(someValuation);
     
     const spy = vi.spyOn(SuperCarModule, 'fetchValuationFromSuperCarValuation')
       .mockResolvedValue(someValuation);
@@ -156,7 +166,7 @@ describe('ValuationService', () => {
 
     expect(spy).toHaveBeenCalledTimes(0);
     expect(result).toBe(someValuation);
-    expect(mockRepository.insert).toHaveBeenCalledTimes(0);
+    expect(mockValuationRepository.insert).toHaveBeenCalledTimes(0);
     expect(mockFailoverService.logSuccessfulRequest).toHaveBeenCalledTimes(0);    
   });
 });

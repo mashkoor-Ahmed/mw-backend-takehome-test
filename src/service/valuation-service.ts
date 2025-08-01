@@ -5,10 +5,13 @@ import { ThirdPartyFailoverService } from './thirdparty-failover-service';
 import { fetchValuationFromSuperCarValuation } from '@app/super-car/super-car-valuation';
 import { fetchValuationFromPremiumCarValuation } from '@app/premium-car/premium-car-valuation';
 import { DependencyUnavailableException } from '@app/errors/dependency-unavailable-exception';
+import { ProviderLogService } from '@app/logging/provider-log-service';
 
 export class ValuationService {
-  constructor(private readonly valuationRepository: Repository<VehicleValuation>,
-    private readonly thirdPartyFailoverService: ThirdPartyFailoverService
+  constructor(
+    private readonly valuationRepository: Repository<VehicleValuation>,
+    private readonly thirdPartyFailoverService: ThirdPartyFailoverService,
+    private readonly providerLogService: ProviderLogService
   ) {}
 
   async createValuation(vrm: string, mileage: number): Promise<VehicleValuation> {
@@ -20,9 +23,9 @@ export class ValuationService {
 
     try {
         if (useFailover) {
-            valuation = await fetchValuationFromPremiumCarValuation(vrm);
+            valuation = await fetchValuationFromPremiumCarValuation(vrm, this.providerLogService);
         } else {
-            valuation = await fetchValuationFromSuperCarValuation(vrm, mileage);
+            valuation = await fetchValuationFromSuperCarValuation(vrm, mileage, this.providerLogService);
             this.thirdPartyFailoverService.logSuccessfulRequest();
         }
 
